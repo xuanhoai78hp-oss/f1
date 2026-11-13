@@ -185,6 +185,7 @@ let playerName = 'Ghost_99';
 let gameMode = 'training';
 let socket = null;
 let otherPlayers = {};
+let leaderboardSignature = '';
 
 function selectCountry(code, pColor, sColor, el) {
     document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
@@ -706,9 +707,53 @@ function drawRadar() {
 }
 
 function updateLeaderboardUI() {
-    let bestStr = bestLapTime < 999 ? bestLapTime.toFixed(2) + 's' : '--:--.--';
-    let listHTML = `<div class="lb-row" style="color:#ffe94d; font-weight:bold;"><span>${playerName}</span><span style="color:#00ffc8;">${bestStr}</span></div>`;
-    document.getElementById('lbContent').innerHTML = listHTML;
+    const leaderboard = [{
+        id: 'self',
+        name: playerName,
+        bestTime: bestLapTime
+    }];
+
+    if (gameMode === 'multi') {
+        for (const [id, player] of Object.entries(otherPlayers)) {
+            leaderboard.push({
+                id,
+                name: player.name,
+                bestTime: player.bestTime
+            });
+        }
+    }
+
+    leaderboard.sort((a, b) => {
+        const timeA = Number.isFinite(a.bestTime) && a.bestTime < 999 ? a.bestTime : Infinity;
+        const timeB = Number.isFinite(b.bestTime) && b.bestTime < 999 ? b.bestTime : Infinity;
+        return timeA - timeB || a.name.localeCompare(b.name);
+    });
+
+    const signature = JSON.stringify(leaderboard.map(({ id, name, bestTime }) => [id, name, bestTime]));
+    if (signature === leaderboardSignature) return;
+    leaderboardSignature = signature;
+
+    const content = document.getElementById('lbContent');
+    content.replaceChildren();
+
+    for (const player of leaderboard) {
+        const row = document.createElement('div');
+        row.className = 'lb-row';
+        const name = document.createElement('span');
+        name.textContent = player.name;
+        const time = document.createElement('span');
+        const hasRecord = Number.isFinite(player.bestTime) && player.bestTime < 999;
+        time.textContent = hasRecord ? `${player.bestTime.toFixed(2)}s` : '--:--.--';
+        time.style.color = '#00ffc8';
+
+        if (player.id === 'self') {
+            row.style.color = '#ffe94d';
+            row.style.fontWeight = 'bold';
+        }
+
+        row.append(name, time);
+        content.append(row);
+    }
 }
 
 function showMsg(text, sec) {
@@ -808,6 +853,7 @@ function startGame(mode) {
             for (const id in data) {
                 if (id !== myId) otherPlayers[id] = data[id];
             }
+            updateLeaderboardUI();
         });
         showMsg('🌐 Đã kết nối phòng Đua Xe F1 Trực Tuyến!', 2.5);
     } else {
