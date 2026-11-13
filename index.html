@@ -790,10 +790,21 @@ function startGame(mode) {
 
     if (mode === 'multi') {
         socket = io();
-        socket.emit('join_game', { name: playerName, country: selectedCountry, primaryColor, secondaryColor });
+
+        socket.on('connect', () => {
+            socket.emit('join_game', {
+                name: playerName,
+                country: selectedCountry,
+                primaryColor,
+                secondaryColor
+            });
+        });
+
         socket.on('update_players', (data) => {
+            if (!socket) return;
             const myId = socket.id;
             otherPlayers = {};
+
             for (const id in data) {
                 if (id !== myId) otherPlayers[id] = data[id];
             }
