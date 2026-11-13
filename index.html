@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>F1 Grand Prix - World Circuit</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+html, body { width:100%; height:100%; overflow:hidden; background:#000; font-family:Arial,sans-serif; }
+#game { display:block; width:100%; height:100%; touch-action:none; }
+
+#hud {
+    position:fixed; top:0; left:0; width:100%; padding:10px 15px;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    color:#fff; font-size:14px; pointer-events:none; text-shadow:1px 1px 2px #000;
+    z-index:10;
+}
+#hud .lap-info { font-size:16px; font-weight:bold; color:#ffe94d; }
+
+#bigmsg {
+    position:fixed; top:35%; left:50%; transform:translate(-50%,-50%);
+    color:#ffe94d; font-size:22px; font-weight:bold; text-align:center;
+    text-shadow:0 0 10px #000, 0 0 6px #000; pointer-events:none;
+    width:90%; line-height:1.4; z-index:12; white-space:pre-line;
+}
+
+/* CỤM ĐIỀU KHIỂN RIÊNG DÀNH CHO MOBILE */
+/* Phía trái: Nút RẼ TRÁI (A) và RẼ PHẢI (D) */
+.pad-left { position:fixed; bottom:20px; left:20px; z-index:20; display:flex; gap:15px; }
+.btn-steer {
+    width:75px; height:75px; border-radius:50%; font-weight:bold; color:#fff; font-size:20px;
+    background:rgba(255,255,255,0.2); border:3px solid rgba(255,255,255,0.6);
+    backdrop-filter:blur(4px); touch-action:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+.btn-steer:active, .btn-steer.active { background:rgba(0,255,204,0.6); border-color:#00ffcc; transform:scale(0.95); }
+
+/* Phía phải: Nút GA, PHANH và DRIFT */
+.pad-right { position:fixed; bottom:20px; right:20px; z-index:20; display:flex; flex-direction:column; gap:10px; align-items:flex-end; }
+.btn-pedal {
+    width:85px; height:60px; border-radius:14px; font-weight:bold; color:#fff; font-size:15px;
+    backdrop-filter:blur(4px); touch-action:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; text-shadow:1px 1px 2px #000;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+#btnGas   { background:rgba(46,204,113,0.35); border:3px solid #2ecc71; }
+#btnBrake { background:rgba(231,76,60,0.35); border:3px solid #e74c3c; }
+#btnGas:active, #btnGas.active { background:rgba(46,204,113,0.8); }
+#btnBrake:active, #btnBrake.active { background:rgba(231,76,60,0.8); }
+
+#btnDrift {
+    width:85px; height:45px; border-radius:10px; font-size:14px; font-weight:bold; color:#fff;
+    background:rgba(255,165,0,0.35); border:2px solid rgba(255,165,0,0.9);
+    display:flex; align-items:center; justify-content:center;
+    touch-action:none; cursor:pointer; text-shadow:1px 1px 2px #000;
+}
+#btnDrift:active, #btnDrift.active { background:rgba(255,165,0,0.8); }
+
+/* RADAR GÓC TRÊN PHẢI */
+#radar {
+    position: fixed; top: 12px; right: 12px; width: 120px; height: 120px;
+    background: rgba(0, 20, 40, 0.8); border: 2px solid #00ffcc; border-radius: 50%;
+    overflow: hidden; pointer-events: none; z-index: 15; box-shadow: 0 0 10px rgba(0,255,204,0.3);
+}
+
+/* BẢNG XẾP HẠNG THỜI GIAN VÒNG ĐUA */
+#leaderboard {
+    position: fixed; top: 140px; right: 12px; width: 185px;
+    background: rgba(0, 20, 40, 0.9); border: 2px solid #00ffcc; border-radius: 8px;
+    padding: 8px; font-size: 11px; color: #fff; z-index: 15; pointer-events: none;
+    box-shadow: 0 0 10px rgba(0,255,204,0.3); text-align: left; max-height: 180px; overflow-y: auto;
+}
+.lb-row { display: flex; justify-content: space-between; margin-bottom: 3px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px; }
+
+/* OVERLAY SẢNH CHỜ */
+#overlay {
+    position:fixed; inset:0; background:rgba(10,25,40,0.96);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#fff; text-align:center; padding:20px; z-index:50; overflow-y:auto;
+}
+#overlay h1 { font-size:24px; color:#ffe94d; margin-bottom:10px; }
+.class-grid { display:flex; gap:12px; margin:12px 0; flex-wrap:wrap; justify-content:center; }
+.class-card {
+    border:2px solid #444; background:#152238; padding:12px; border-radius:10px;
+    cursor:pointer; text-align:center; width:150px; transition:0.2s;
+}
+.class-card.selected { border-color:#00ffcc; background:#1e3557; box-shadow:0 0 12px rgba(0,255,204,0.4); }
+#overlay input { padding:8px; font-size:15px; width:200px; text-align:center; border-radius:8px; border:none; margin:8px 0; }
+
+.mode-buttons { display:flex; gap:15px; margin-top:15px; }
+.mode-btn {
+    padding:12px 24px; font-size:16px; font-weight:bold; border:none; border-radius:10px; cursor:pointer;
+}
+#btnTraining { background:#f39c12; color:#fff; }
+#btnMulti { background:#2ecc71; color:#fff; box-shadow:0 0 10px rgba(46,204,113,0.5); }
+</style>
+<script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<canvas id="radar" width="120" height="120"></canvas>
+
+<!-- BẢNG XẾP HẠNG THỜI GIAN (LAP TIMER) -->
+<div id="leaderboard">
+    <div style="font-weight:bold; color:#ffe94d; border-bottom:1px solid rgba(255,255,255,0.3); padding-bottom:3px; margin-bottom:5px; text-align:center;">⏱️ KỶ LỤC VÒNG ĐUA</div>
+    <div id="lbContent">
+        <div class="lb-row"><span>Ghost_99</span><span style="color:#00ffc8;">--:--.--</span></div>
+    </div>
+</div>
+
+<div id="hud">
+    <div class="left"><div class="lap-info">VÒNG: <span id="lapTxt">1</span> / 3 | THỜI GIAN: <span id="timeTxt">00.00s</span></div></div>
+</div>
+
+<div id="bigmsg"></div>
+
+<!-- Nút Rẽ Trái / Phải bên trái màn hình -->
+<div class="pad-left">
+    <div class="btn-steer" id="btnA">A</div>
+    <div class="btn-steer" id="btnD">D</div>
+</div>
+
+<!-- Nút Tăng Tốc / Phanh / Drift bên phải màn hình -->
+<div class="pad-right">
+    <div class="btn-pedal" id="btnGas">⚡ GA</div>
+    <div class="btn-pedal" id="btnBrake">🛑 PHANH</div>
+    <div id="btnDrift">DRIFT</div>
+</div>
+
+<div id="overlay">
+    <h1>🏎️ CHỌN MÀU SẮC ĐỘI ĐUA F1</h1>
+    <p style="font-size:13px; color:#aaa;">Chọn màu biểu trưng cho chiếc xe đua Công Thức 1 của bạn</p>
+    
+    <div class="class-grid">
+        <div class="class-card selected" onclick="selectCountry('VN', '#da251d', '#ffeb00', this)">
+            <h3 style="color:#ffeb00; font-size:14px;">🇻🇳 Việt Nam</h3>
+            <p style="font-size:10px; color:#88a;">Đỏ cờ sắc vàng</p>
+        </div>
+        <div class="class-card" onclick="selectCountry('USA', '#3c3b6e', '#b22234', this)">
+            <h3 style="color:#38bdf8; font-size:14px;">🇺🇸 Hợp Chủng Quốc</h3>
+            <p style="font-size:10px; color:#88a;">Xanh dương & Đỏ</p>
+        </div>
+        <div class="class-card" onclick="selectCountry('JP', '#bc002d', '#ffffff', this)">
+            <h3 style="color:#fff; font-size:14px;">🇯🇵 Nhật Bản</h3>
+            <p style="font-size:10px; color:#88a;">Mặt trời đỏ - trắng</p>
+        </div>
+    </div>
+
+    <input type="text" id="playerNameInput" placeholder="Nhập tên tay đua..." value="Ghost_99"><br>
+    
+    <div class="mode-buttons">
+        <button class="mode-btn" id="btnTraining" onclick="startGame('training')">🏁 ĐUA TẬP LUYỆN</button>
+        <button class="mode-btn" id="btnMulti" onclick="startGame('multi')">🌐 ĐUA TRỰC TUYẾN</button>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const radarCanvas = document.getElementById('radar');
+const radarCtx = radarCanvas.getContext('2d');
+
+let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+let selectedCountry = 'VN';
+let primaryColor = '#da251d';
+let secondaryColor = '#ffeb00';
+let playerName = 'Ghost_99';
+let gameMode = 'training';
+let socket = null;
+let otherPlayers = {};
+
+function selectCountry(code, pColor, sColor, el) {
+    document.querySelectorAll('.class-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedCountry = code;
+    primaryColor = pColor;
+    secondaryColor = sColor;
+}
+
+function getTrackPoint(t) {
+    const a = t * Math.PI * 2;
+    const r = 760 + Math.sin(3 * a + 1.4) * 180 + Math.cos(5 * a + 0.8) * 50;
+    return {
+        x: Math.cos(a) * r,
+        y: Math.sin(a) * (530 + Math.cos(4 * a - 0.6) * 180),
+    };
+}
+
+function buildTrackSamples() {
+    const points = [];
+    for (let i = 0; i <= 420; i++) {
+        const t = ((Math.PI * 0.12 / (Math.PI * 2) - i / 420) % 1 + 1) % 1;
+        const p = getTrackPoint(t);
+        points.push(p);
+    }
+    return points;
+}
+
+const trackSamples = buildTrackSamples();
+const trackCumulativeLengths = [0];
+for (let i = 1; i < trackSamples.length; i++) {
+    const previous = trackSamples[i - 1];
+    const current = trackSamples[i];
+    trackCumulativeLengths.push(
+        trackCumulativeLengths[i - 1] + Math.hypot(current.x - previous.x, current.y - previous.y)
+    );
+}
+const trackLength = trackCumulativeLengths[trackCumulativeLengths.length - 1];
+
+function getTrackPose(distance) {
+    const wrappedDistance = ((distance % trackLength) + trackLength) % trackLength;
+    let low = 0;
+    let high = trackCumulativeLengths.length - 1;
+
+    while (low < high - 1) {
+        const middle = Math.floor((low + high) / 2);
+        if (trackCumulativeLengths[middle] <= wrappedDistance) low = middle;
+        else high = middle;
+    }
+
+    const start = trackSamples[low];
+    const end = trackSamples[low + 1];
+    const segmentLength = trackCumulativeLengths[low + 1] - trackCumulativeLengths[low];
+    const ratio = segmentLength > 0
+        ? (wrappedDistance - trackCumulativeLengths[low]) / segmentLength
+        : 0;
+    const angle = Math.atan2(end.y - start.y, end.x - start.x);
+
+    return {
+        x: start.x + (end.x - start.x) * ratio,
+        y: start.y + (end.y - start.y) * ratio,
+        angle
+    };
+}
+
+const WORLD_WIDTH = 2200;
+const WORLD_HEIGHT = 2200;
+const TRACK_WIDTH = 190;
+const DISTANCE_PER_SPEED = 15;
+const startPose = getTrackPose(0);
+const finishLine = { x: startPose.x, y: startPose.y, angle: startPose.angle, w: 36, h: 140 };
+const obstacles = Array.from({ length: 10 }, (_, index) => ({
+    distance: trackLength * (0.06 + index * 0.095),
+    side: index % 2 === 0 ? -1 : 1,
+    color: ['#e74c3c', '#f39c12', '#3498db', '#9b59b6', '#ecf0f1'][index % 5],
+    lastHitLap: -1
+}));
+
+let car = null;
+let npcCar = null;
+let smokeParticles = [];
+let lapCount = 1;
+let currentLapTime = 0;
+let bestLapTime = 9999;
+let hasCrossedLine = false;
+
+const state = { running: false, flowStarted: false };
+
+let audioCtx = null;
+let engineOsc = null;
+let engineGain = null;
+
+function initAudio() {
+    if (!audioCtx) {
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            engineOsc = audioCtx.createOscillator();
+            engineGain = audioCtx.createGain();
+            engineOsc.type = 'sawtooth';
+            engineOsc.frequency.value = 80;
+            engineGain.gain.value = 0.0;
+            engineOsc.connect(engineGain);
+            engineGain.connect(audioCtx.destination);
+            engineOsc.start();
+        } catch (e) {}
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function updateEngineSound(speedRatio, isAccelerating) {
+    if (!engineOsc || !engineGain) return;
+    try {
+        const targetFreq = 70 + speedRatio * 380;
+        engineOsc.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.05);
+        engineGain.gain.setTargetAtTime(isAccelerating ? 0.07 : 0.02, audioCtx.currentTime, 0.05);
+    } catch (e) {}
+}
+
+function makeCar() {
+    const start = getTrackPose(0);
+
+    return {
+        x: start.x,
+        y: start.y,
+        angle: start.angle,
+        speed: 0,
+        maxSpeed: 6.2,
+        accel: 0.09,
+        friction: 0.972,
+        size: 24,
+        name: playerName,
+        primaryColor: primaryColor,
+        secondaryColor: secondaryColor,
+        distance: 0,
+        lapProgress: 0,
+        laneOffset: 0,
+        steer: 0,
+        completedLaps: 0,
+        crashTimer: 0,
+        crashDuration: 1.1,
+        crashSpin: 0,
+        recovering: false
+    };
+}
+
+function makeNPC() {
+    const distance = trackLength * 0.12;
+    const position = getTrackPose(distance);
+    return {
+        x: position.x,
+        y: position.y,
+        angle: position.angle,
+        speed: 4.2,
+        size: 24,
+        name: '🤖 Safety NPC',
+        primaryColor: '#9b59b6',
+        secondaryColor: '#f1c40f',
+        distance
+    };
+}
+
+function updateNPC(dt) {
+    if (!npcCar) return;
+
+    npcCar.distance += npcCar.speed * DISTANCE_PER_SPEED * dt;
+    const position = getTrackPose(npcCar.distance);
+    npcCar.x = position.x;
+    npcCar.y = position.y;
+    npcCar.angle = position.angle;
+}
+
+let last = 0;
+function loop(ts) {
+    if (!last) last = ts;
+    let dt = (ts - last) / 1000;
+    last = ts;
+    if (dt > 0.05) dt = 0.05;
+
+    update(dt);
+    render();
+    drawRadar();
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function update(dt) {
+    if (!state.running) return;
+
+    if (car) {
+        currentLapTime += dt;
+        document.getElementById('timeTxt').textContent = currentLapTime.toFixed(2) + 's';
+
+        const steering = (input.left ? -1 : 0) + (input.right ? 1 : 0);
+        car.steer = steering;
+
+        let isAccelerating = false;
+        if (car.crashTimer > 0) {
+            car.crashTimer = Math.max(0, car.crashTimer - dt);
+            car.crashSpin = Math.PI * 2 * (1 - car.crashTimer / car.crashDuration);
+            car.speed = 0;
+        } else {
+            car.crashSpin = 0;
+            if (car.recovering) {
+                car.speed = Math.min(
+                    car.maxSpeed * 0.5,
+                    car.speed + car.accel * 60 * dt * 0.5
+                );
+                if (car.speed >= car.maxSpeed * 0.5) car.recovering = false;
+            } else if (input.up) {
+                car.speed = Math.min(
+                    car.maxSpeed,
+                    Math.max(0, car.speed) + car.accel * 60 * dt
+                );
+                isAccelerating = true;
+            } else if (input.down) {
+                car.speed = Math.max(-1.4, car.speed - car.accel * 60 * dt * 1.35);
+            } else {
+                car.speed *= car.friction;
+            }
+
+            if (Math.abs(car.speed) < 0.12) car.speed = 0;
+
+            car.laneOffset = Math.max(
+                -TRACK_WIDTH * 0.32,
+                Math.min(TRACK_WIDTH * 0.32, car.laneOffset + steering * 100 * dt)
+            );
+
+            car.distance += car.speed * DISTANCE_PER_SPEED * dt;
+            if (car.speed > 0) {
+                const hit = obstacles.find(obstacle => {
+                    const obstacleLap = Math.round((car.distance - obstacle.distance) / trackLength);
+                    const obstacleDistance = obstacle.distance + obstacleLap * trackLength;
+                    return obstacle.lastHitLap !== obstacleLap &&
+                        Math.abs(car.distance - obstacleDistance) <= 24 &&
+                        obstacle.side * car.laneOffset > -21;
+                });
+
+                if (hit) {
+                    const obstacleLap = Math.round((car.distance - hit.distance) / trackLength);
+                    hit.lastHitLap = obstacleLap;
+                    car.distance = hit.distance + obstacleLap * trackLength - 30;
+                    car.speed = 0;
+                    car.crashTimer = car.crashDuration;
+                    car.crashSpin = 0;
+                    car.recovering = true;
+                    showMsg('💥 Va chạm! Né sang làn trống để tránh xe cản.', 2);
+                }
+            }
+        }
+
+        updateEngineSound(Math.abs(car.speed) / car.maxSpeed, isAccelerating);
+        car.lapProgress = ((car.distance % trackLength) + trackLength) % trackLength;
+        const position = getTrackPose(car.distance);
+        const normalX = -Math.sin(position.angle);
+        const normalY = Math.cos(position.angle);
+        car.x = position.x + normalX * car.laneOffset;
+        car.y = position.y + normalY * car.laneOffset;
+        car.angle = position.angle;
+
+        if (car.speed > 0.2) {
+            smokeParticles.push({
+                x: car.x - Math.cos(car.angle) * 24 + Math.random() * 12 - 6,
+                y: car.y - Math.sin(car.angle) * 24 + Math.random() * 12 - 6,
+                r: 2 + Math.random() * 4,
+                life: 0.5,
+                drift: Math.abs(car.speed) * 16,
+                dir: Math.random() * Math.PI * 2
+            });
+        }
+
+        const completedLaps = Math.floor(car.distance / trackLength);
+        while (completedLaps > car.completedLaps) {
+            if (currentLapTime > 5.0) {
+                if (currentLapTime < bestLapTime) bestLapTime = currentLapTime;
+                showMsg('🏁 Hoàn thành vòng ' + lapCount + '! Thời gian: ' + currentLapTime.toFixed(2) + 's', 2.5);
+                lapCount++;
+                document.getElementById('lapTxt').textContent = lapCount;
+                currentLapTime = 0;
+                updateLeaderboardUI();
+            }
+            car.completedLaps++;
+        }
+
+        if (socket && socket.connected) {
+            socket.emit('player_move', {
+                x: car.x,
+                y: car.y,
+                angle: car.angle,
+                lap: lapCount,
+                bestTime: bestLapTime,
+                primaryColor: car.primaryColor,
+                secondaryColor: car.secondaryColor
+            });
+        }
+    }
+
+    updateNPC(dt);
+
+    for (let i = smokeParticles.length - 1; i >= 0; i--) {
+        const sp = smokeParticles[i];
+        sp.life -= dt;
+        sp.r += dt * 3.5;
+        sp.x += Math.cos(sp.dir) * sp.drift * dt * 0.08;
+        sp.y += Math.sin(sp.dir) * sp.drift * dt * 0.04;
+        if (sp.life <= 0) smokeParticles.splice(i, 1);
+    }
+}
+
+function render() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#1d7c3e';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    const cameraX = W / 2;
+    const cameraY = H * 0.72;
+    if (car) {
+        ctx.translate(cameraX, cameraY);
+        ctx.rotate(-car.angle - Math.PI / 2);
+        ctx.translate(-car.x, -car.y);
+    }
+
+    const grassGradient = ctx.createRadialGradient(0, 0, 80, 0, 0, 1200);
+    grassGradient.addColorStop(0, '#2b9f50');
+    grassGradient.addColorStop(1, '#134c22');
+    ctx.fillStyle = grassGradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1200, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    for (let i = 0; i < trackSamples.length; i++) {
+        const p = trackSamples[i];
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#3b7a4f';
+    ctx.fill();
+
+    ctx.strokeStyle = '#d9d9d9';
+    ctx.lineWidth = 145;
+    ctx.stroke();
+
+    ctx.strokeStyle = '#485569';
+    ctx.lineWidth = 112;
+    ctx.stroke();
+
+    ctx.strokeStyle = '#f0f1f2';
+    ctx.lineWidth = 8;
+    ctx.setLineDash([28, 26]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    for (const obstacle of obstacles) {
+        const pose = getTrackPose(obstacle.distance);
+        const normalX = -Math.sin(pose.angle);
+        const normalY = Math.cos(pose.angle);
+        ctx.save();
+        ctx.translate(
+            pose.x + normalX * obstacle.side * TRACK_WIDTH * 0.22,
+            pose.y + normalY * obstacle.side * TRACK_WIDTH * 0.22
+        );
+        ctx.rotate(pose.angle + Math.PI);
+        ctx.scale(1, 1.35);
+        drawF1CarShape(obstacle.color, '#222');
+        ctx.restore();
+    }
+
+    ctx.save();
+    ctx.translate(finishLine.x, finishLine.y);
+    ctx.rotate(finishLine.angle + Math.PI / 2);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(-18, -80, 36, 160);
+    ctx.fillStyle = '#111';
+    for (let i = -80; i < 80; i += 18) {
+        ctx.fillRect(-18, i, 18, 10);
+        ctx.fillRect(0, i + 8, 18, 10);
+    }
+    ctx.restore();
+
+    for (let sp of smokeParticles) {
+        ctx.fillStyle = `rgba(220,220,220,${sp.life})`;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    if (npcCar) {
+        drawF1Car(npcCar);
+    }
+
+    for (const id in otherPlayers) {
+        const p = otherPlayers[id];
+        drawOtherF1Car(p);
+    }
+
+    ctx.restore();
+
+    if (car) {
+        const cameraX = W / 2;
+        const cameraY = H * 0.72;
+        ctx.save();
+        ctx.translate(cameraX, cameraY);
+        ctx.rotate(car.crashSpin);
+        drawF1CarShape(car.primaryColor, car.secondaryColor);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(-60, -74, 120, 22);
+        ctx.strokeStyle = car.primaryColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-60, -74, 120, 22);
+        ctx.fillStyle = '#00ffcc';
+        ctx.font = 'bold 11px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(car.name, 0, -59);
+        ctx.restore();
+    }
+}
+
+function drawF1CarShape(colorPrimary, colorSecondary) {
+    ctx.save();
+    const s = 24;
+
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-s * 0.7, -s * 0.8, 7, 12);
+    ctx.fillRect(s * 0.5, -s * 0.8, 7, 12);
+    ctx.fillRect(-s * 0.7, s * 0.4, 8, 14);
+    ctx.fillRect(s * 0.5, s * 0.4, 8, 14);
+
+    ctx.fillStyle = colorSecondary;
+    ctx.fillRect(-s * 0.8, -s * 1.1, s * 1.6, 5);
+
+    ctx.fillStyle = colorPrimary;
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.9);
+    ctx.lineTo(-s * 0.4, s * 0.8);
+    ctx.lineTo(s * 0.4, s * 0.8);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.ellipse(0, -s * 0.1, s * 0.22, s * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff3b3b';
+    ctx.beginPath(); ctx.arc(0, -s * 0.15, 4, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = colorSecondary;
+    ctx.fillRect(-s * 0.7, s * 0.9, s * 1.4, 6);
+
+    ctx.restore();
+}
+
+function drawF1Car(c) {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.angle + Math.PI / 2);
+    drawF1CarShape(c.primaryColor, c.secondaryColor);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(c.x, c.y - 38);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(-60, -16, 120, 22);
+    ctx.strokeStyle = c.primaryColor || '#00ffcc';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-60, -16, 120, 22);
+
+    ctx.fillStyle = '#00ffcc';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(c.name, 0, -2);
+    ctx.restore();
+}
+
+function drawRadar() {
+    radarCtx.clearRect(0, 0, 120, 120);
+    if (!car) return;
+
+    radarCtx.fillStyle = 'rgba(0, 20, 40, 0.8)';
+    radarCtx.fillRect(0, 0, 120, 120);
+
+    radarCtx.strokeStyle = '#00ffcc';
+    radarCtx.lineWidth = 2;
+    radarCtx.beginPath();
+    radarCtx.arc(60, 60, 52, 0, Math.PI * 2);
+    radarCtx.stroke();
+
+    const radarScale = 0.055;
+    radarCtx.strokeStyle = '#4af0c0';
+    radarCtx.lineWidth = 4;
+    radarCtx.beginPath();
+    for (let i = 0; i < trackSamples.length; i++) {
+        const p = trackSamples[i];
+        const x = 60 + p.x * radarScale;
+        const y = 60 + p.y * radarScale;
+        if (i === 0) radarCtx.moveTo(x, y);
+        else radarCtx.lineTo(x, y);
+    }
+    radarCtx.closePath();
+    radarCtx.stroke();
+
+    for (const id in otherPlayers) {
+        const p = otherPlayers[id];
+        radarCtx.fillStyle = '#3498db';
+        radarCtx.fillRect(60 + p.x * radarScale - 2, 60 + p.y * radarScale - 2, 4, 4);
+    }
+
+    if (npcCar) {
+        radarCtx.fillStyle = '#9b59b6';
+        radarCtx.fillRect(60 + npcCar.x * radarScale - 2, 60 + npcCar.y * radarScale - 2, 4, 4);
+    }
+
+    radarCtx.fillStyle = '#00ff00';
+    radarCtx.beginPath();
+    radarCtx.arc(60 + car.x * radarScale, 60 + car.y * radarScale, 4, 0, Math.PI * 2);
+    radarCtx.fill();
+}
+
+function updateLeaderboardUI() {
+    let bestStr = bestLapTime < 999 ? bestLapTime.toFixed(2) + 's' : '--:--.--';
+    let listHTML = `<div class="lb-row" style="color:#ffe94d; font-weight:bold;"><span>${playerName}</span><span style="color:#00ffc8;">${bestStr}</span></div>`;
+    document.getElementById('lbContent').innerHTML = listHTML;
+}
+
+function showMsg(text, sec) {
+    document.getElementById('bigmsg').textContent = text;
+    setTimeout(() => { document.getElementById('bigmsg').textContent = ''; }, sec * 1000);
+}
+
+const input = { left: false, right: false, up: false, down: false };
+
+function pressThrottle() {
+    if (!input.up && car) {
+        car.speed = Math.max(0, car.speed, 0.8);
+    }
+    input.up = true;
+}
+
+window.addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (k === 'a') input.left = true;
+    if (k === 'd') input.right = true;
+    if (k === 'w' || k === 'arrowup') pressThrottle();
+    if (k === 's') input.down = true;
+    if (k === 'arrowleft') input.left = true;
+    if (k === 'arrowright') input.right = true;
+    if (k === 'arrowdown') input.down = true;
+});
+window.addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    if (k === 'a') input.left = false;
+    if (k === 'd') input.right = false;
+    if (k === 'w' || k === 'arrowup') input.up = false;
+    if (k === 's') input.down = false;
+    if (k === 'arrowleft') input.left = false;
+    if (k === 'arrowright') input.right = false;
+    if (k === 'arrowdown') input.down = false;
+});
+window.addEventListener('blur', () => {
+    input.left = false;
+    input.right = false;
+    input.up = false;
+    input.down = false;
+});
+
+function bindHold(el, onDown, onUp) {
+    el.addEventListener('touchstart', e => { e.preventDefault(); el.classList.add('active'); onDown(); }, { passive: false });
+    el.addEventListener('touchend', e => { e.preventDefault(); el.classList.remove('active'); if (onUp) onUp(); }, { passive: false });
+    el.addEventListener('touchcancel', e => { e.preventDefault(); el.classList.remove('active'); if (onUp) onUp(); }, { passive: false });
+    el.addEventListener('mousedown', e => { e.preventDefault(); el.classList.add('active'); onDown(); });
+    el.addEventListener('mouseup', e => { e.preventDefault(); el.classList.remove('active'); if (onUp) onUp(); });
+}
+
+bindHold(document.getElementById('btnA'), () => input.left = true, () => input.left = false);
+bindHold(document.getElementById('btnD'), () => input.right = true, () => input.right = false);
+bindHold(document.getElementById('btnGas'), pressThrottle, () => input.up = false);
+bindHold(document.getElementById('btnBrake'), () => input.down = true, () => input.down = false);
+
+const driftBtn = document.getElementById('btnDrift');
+bindHold(driftBtn, () => {
+    if (!car) return;
+    car.speed *= 0.65;
+}, () => {});
+
+function startGame(mode) {
+    initAudio();
+    gameMode = mode;
+
+    const rawInput = document.getElementById('playerNameInput').value.trim();
+    if (rawInput !== '') playerName = rawInput;
+
+    state.running = true;
+    lapCount = 1;
+    currentLapTime = 0;
+    bestLapTime = 999;
+    document.getElementById('lapTxt').textContent = lapCount;
+
+    car = makeCar();
+    npcCar = makeNPC();
+    obstacles.forEach(obstacle => obstacle.lastHitLap = -1);
+
+    if (mode === 'multi') {
+        socket = io();
+        socket.emit('join_game', { name: playerName, country: selectedCountry, primaryColor, secondaryColor });
+        socket.on('update_players', (data) => {
+            const myId = socket.id;
+            otherPlayers = {};
+            for (const id in data) {
+                if (id !== myId) otherPlayers[id] = data[id];
+            }
+        });
+        showMsg('🌐 Đã kết nối phòng Đua Xe F1 Trực Tuyến!', 2.5);
+    } else {
+        if (socket) {
+            socket.disconnect();
+            socket = null;
+        }
+        otherPlayers = {};
+        updateLeaderboardUI();
+        showMsg('🏎️ Sẵn sàng xuất phát! Nhấn GA để tăng tốc!', 2.5);
+    }
+
+    document.getElementById('overlay').style.display = 'none';
+}
+</script>
+</body>
+</html>
